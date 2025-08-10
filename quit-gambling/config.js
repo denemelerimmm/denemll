@@ -1,3 +1,3 @@
 window.APP_CONFIG = {
-  API_BASE: 'http://localhost:8787'
+  API_BASE: 'https://teams-diana-forbes-minds.trycloudflare.com'
 }
