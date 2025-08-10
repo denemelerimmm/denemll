@@ -46,9 +46,9 @@ function renderAdmin(){
   if(MO) MO.textContent = String(m.online)
   if(MR) MR.textContent = fmt(m.revenue)
   const list = $('#revenueList'); if(list){ list.innerHTML=''; auth.revenue.slice(-20).reverse().forEach(r=>{ const li=document.createElement('li'); li.innerHTML=`<div><strong>${r.email}</strong><div class="meta">${new Date(r.at).toLocaleString('tr-TR')}</div></div><div>${fmt(r.amount)}</div>`; list.appendChild(li) }) }
-  // Admin-only visibility
   const isAdmin = auth.roles[auth.session.email] === 'admin'
   $$('.admin-only').forEach(el => el.classList.toggle('hidden', !isAdmin))
+  if (isAdmin) renderAdminStories()
 }
 
 $('#addRevenue')?.addEventListener('click', () => {
@@ -247,26 +247,71 @@ function toYouTubeEmbed(url){
   return ''
 }
 
+// Global shared stores (admin-managed)
+const globalStore = {
+  stories: storage.get('global:stories', []) // shared across users
+}
+function saveGlobal(){ storage.set('global:stories', globalStore.stories) }
+
+// Remove per-user stories usage; render dashboard from global
 function renderStories(){
   const videoC = $('#storiesVideo'); const textC = $('#storiesText')
   if(!videoC || !textC) return
   videoC.innerHTML=''; textC.innerHTML=''
-  state.stories.filter(s=>s.type==='video').forEach(s=>{
+  // pick up to 3 random items per type
+  const videos = globalStore.stories.filter(s=>s.type==='video')
+  const texts = globalStore.stories.filter(s=>s.type==='text')
+  const pick = (arr, n)=> arr.slice().sort(()=>Math.random()-0.5).slice(0, Math.min(n, arr.length))
+  pick(videos, 3).forEach(s=>{
     const wrap = document.createElement('div')
     const embed = toYouTubeEmbed(s.url||'')
-    if (embed){
-      wrap.innerHTML = `<div class="video"><iframe src="${embed}?rel=0" allowfullscreen loading="lazy"></iframe></div><div class="meta" style="margin-top:6px">${s.title||''}</div>`
-    } else {
-      wrap.innerHTML = `<div><a class="meta" target="_blank" rel="noopener" href="${s.url}">${s.title||s.url}</a></div>`
-    }
+    if (embed){ wrap.innerHTML = `<div class="video"><iframe src="${embed}?rel=0" allowfullscreen loading="lazy"></iframe></div><div class="meta" style="margin-top:6px">${s.title||''}</div>` }
+    else { wrap.innerHTML = `<div><a class="meta" target="_blank" rel="noopener" href="${s.url}">${s.title||s.url}</a></div>` }
     videoC.appendChild(wrap)
   })
-  state.stories.filter(s=>s.type==='text').forEach(s=>{
-    const div = document.createElement('div')
-    div.className='card'
+  pick(texts, 3).forEach(s=>{
+    const div = document.createElement('div'); div.className='card'
     div.innerHTML = `<strong>${s.title||'Hikaye'}</strong><div class="meta" style="margin-top:6px">${(s.content||'').replace(/</g,'&lt;')}</div>`
     textC.appendChild(div)
   })
+}
+
+// Admin panel for stories
+$('#adminStoryType')?.addEventListener('change', ()=>{
+  const t = $('#adminStoryType').value
+  $('#adminStoryUrlField').hidden = t!=='video'
+  $('#adminStoryContentField').hidden = t!=='text'
+})
+
+$('#adminAddStory')?.addEventListener('click', () => {
+  const type = $('#adminStoryType').value
+  const title = ($('#adminStoryTitle').value||'').trim()
+  const url = ($('#adminStoryUrl').value||'').trim()
+  const content = ($('#adminStoryContent').value||'').trim()
+  if (type==='video' && !url) return
+  if (type==='text' && !content) return
+  const id = (crypto.randomUUID && crypto.randomUUID()) || String(Date.now())
+  globalStore.stories.unshift({ id, type, title, url, content, addedAt: new Date().toISOString(), by: auth.session.email })
+  saveGlobal(); renderAdminStories(); renderStories(); $('#adminStoryTitle').value=''; $('#adminStoryUrl').value=''; $('#adminStoryContent').value=''
+})
+
+function renderAdminStories(){
+  const list = $('#adminStoriesList'); if(!list) return; list.innerHTML=''
+  globalStore.stories.slice(0,100).forEach(s=>{
+    const li = document.createElement('li')
+    const meta = new Date(s.addedAt).toLocaleString('tr-TR')
+    li.innerHTML = `<div>
+      <div><strong>${s.title||'(başlık yok)'}</strong> <span class="badge">${s.type}</span></div>
+      <div class="meta">${s.by||''} · ${meta}${s.url? ' · '+s.url: ''}</div>
+    </div>
+    <div class="actions"><button class="btn ghost" data-del-story="${s.id}">Sil</button></div>`
+    list.appendChild(li)
+  })
+  $$('[data-del-story]')?.forEach(btn=> btn.addEventListener('click', () => {
+    const id = btn.getAttribute('data-del-story')
+    globalStore.stories = globalStore.stories.filter(s=>s.id!==id)
+    saveGlobal(); renderAdminStories(); renderStories()
+  }))
 }
 
 // Stories UI events
@@ -295,7 +340,73 @@ $('#addStory')?.addEventListener('click', () => {
   saveAll(); renderStories(); $('#storyTitle').value=''; $('#storyUrl').value=''; $('#storyContent').value=''
 })
 
-function renderAll(){ renderCheckins(); renderTriggers(); renderUrges(); updateDashboard(); loadSettingsUI(); renderStories() }
+// SVG helpers for charts
+function svgEl(name, attrs={}){ const el=document.createElementNS('http://www.w3.org/2000/svg', name); for(const [k,v] of Object.entries(attrs)){ el.setAttribute(k, String(v)) } return el }
+function renderBars(containerId, values, colors){
+  const el = document.getElementById(containerId); if(!el) return; el.innerHTML=''
+  const w = el.clientWidth || 320, h = el.clientHeight || 160, pad=16
+  const svg = svgEl('svg', { viewBox:`0 0 ${w} ${h}`, preserveAspectRatio:'none' })
+  // grid
+  for(let i=0;i<4;i++){ const y=pad + (h-2*pad)*i/3; svg.appendChild(svgEl('line',{x1:pad,y1:y,x2:w-pad,y2:y,class:'gridline'})) }
+  const max = Math.max(1, ...values)
+  const bw = (w-2*pad)/values.length
+  values.forEach((v, i) => {
+    const x = pad + i*bw + bw*0.1
+    const bh = (h-2*pad) * (v/max)
+    const y = h - pad - bh
+    const rect = svgEl('rect', { x, y, width:bw*0.8, height:Math.max(2,bh), class:'bar', fill: colors?.[i] || '#22c55e' })
+    svg.appendChild(rect)
+  })
+  el.appendChild(svg)
+}
+function renderLine(containerId, values){
+  const el = document.getElementById(containerId); if(!el) return; el.innerHTML=''
+  const w = el.clientWidth || 320, h = el.clientHeight || 160, pad=16
+  const svg = svgEl('svg', { viewBox:`0 0 ${w} ${h}`, preserveAspectRatio:'none' })
+  // gradient
+  const defs = svgEl('defs'); const grad = svgEl('linearGradient',{id:'gradLine',x1:'0',x2:'1',y1:'0',y2:'0'})
+  grad.appendChild(svgEl('stop',{offset:'0%',stop-color:'#38bdf8'})); grad.appendChild(svgEl('stop',{offset:'100%',stop-color:'#22c55e'})); defs.appendChild(grad); svg.appendChild(defs)
+  for(let i=0;i<4;i++){ const y=pad + (h-2*pad)*i/3; svg.appendChild(svgEl('line',{x1:pad,y1:y,x2:w-pad,y2:y,class:'gridline'})) }
+  const n = values.length; const max = Math.max(1, ...values)
+  const pts = values.map((v,i)=>{ const x=pad + (w-2*pad)*(i/(Math.max(1,n-1))); const y=h-pad - (h-2*pad)*(v/max); return [x,y] })
+  const d = pts.map(([x,y],i)=> (i? 'L':'M')+x+','+y ).join(' ')
+  svg.appendChild(svgEl('path',{ d, class:'line' }))
+  pts.forEach(([x,y])=> svg.appendChild(svgEl('circle',{cx:x, cy:y, r:3, class:'dot'})))
+  el.appendChild(svg)
+}
+function renderDonut(containerId, value, total){
+  const el = document.getElementById(containerId); if(!el) return; el.innerHTML=''
+  const w=el.clientWidth||240, h=el.clientHeight||180, r=Math.min(w,h)/2 - 16, cx=w/2, cy=h/2
+  const svg = svgEl('svg',{ viewBox:`0 0 ${w} ${h}`, preserveAspectRatio:'none' })
+  const bg = svgEl('circle',{ cx, cy, r, fill:'none', stroke:'#1f2937', 'stroke-width':14 })
+  svg.appendChild(bg)
+  const frac = total>0? value/total : 0
+  const circ = 2*Math.PI*r
+  const fg = svgEl('circle',{ cx, cy, r, fill:'none', stroke:'#22c55e', 'stroke-width':14, 'stroke-dasharray':`${circ*frac} ${circ*(1-frac)}`, 'transform':`rotate(-90 ${cx} ${cy})` })
+  svg.appendChild(fg)
+  const txt = svgEl('text',{ x:cx, y:cy+4, 'text-anchor':'middle', fill:'#e2e8f0', 'font-size':18 })
+  txt.textContent = total>0 ? Math.round(frac*100)+'%' : '—'
+  svg.appendChild(txt)
+  el.appendChild(svg)
+}
+
+function renderCharts(){
+  // Bars: last 7 days check-ins
+  const today = new Date(); const dates=[]; for(let i=6;i>=0;i--){ const d=new Date(today); d.setDate(today.getDate()-i); dates.push(formatYMD(d)) }
+  const colors=[]; const values = dates.map(d=>{ const c=state.checkins.find(x=>x.date===d); if(!c){ colors.push('#334155'); return 0.2 } if (c.success===false){ colors.push('#ef4444'); return 0.6 } colors.push('#22c55e'); return 1 })
+  renderBars('chartCheckins', values, colors)
+
+  // Line: last up to 7 urge durations
+  const urges = state.urges.slice(0,7).map(u=>Math.max(1, Math.round(u.durationSec||0)))
+  renderLine('chartUrges', urges.reverse())
+
+  // Donut: success ratio
+  const total = state.checkins.length
+  const success = state.checkins.filter(c=>c.success===true).length
+  renderDonut('chartDonut', success, total)
+}
+
+function renderAll(){ renderCheckins(); renderTriggers(); renderUrges(); updateDashboard(); loadSettingsUI(); renderStories(); renderCharts() }
 
 // Auth events
 $('#loginBtn')?.addEventListener('click', async () => {

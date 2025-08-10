@@ -54,3 +54,11 @@ input[type="range"]{width:100%}
 .stories{display:grid;gap:12px}
 .video{position:relative;padding-top:56.25%;border-radius:12px;overflow:hidden;border:1px solid var(--border)}
 .video iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000}
+.chart{height:160px;background:#0b1323;border:1px solid var(--border);border-radius:12px;padding:8px;display:block}
+.chart svg{width:100%;height:100%;display:block}
+.chart .gridline{stroke:#1f2937;stroke-width:1}
+.chart .bar{rx:4}
+.chart .line{fill:none;stroke:url(#gradLine);stroke-width:2}
+.chart .dot{fill:#38bdf8}
+.legend{display:flex;gap:8px;align-items:center;margin:6px 0}
+.legend .swatch{width:10px;height:10px;border-radius:2px;display:inline-block}

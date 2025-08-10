@@ -75,12 +75,30 @@
         <div class="card">
           <h3>İbretlik Hikayeler</h3>
           <div class="tabs" role="tablist">
-            <button class="tab small" data-stories-tab="video">Videolar</button>
-            <button class="tab small" data-stories-tab="text">Yazılar</button>
+            <button class="tab small" data-stories-tab="video">🎬 Videolar</button>
+            <button class="tab small" data-stories-tab="text">📝 Yazılar</button>
           </div>
           <div id="storiesVideo" class="stories"></div>
           <div id="storiesText" class="stories" hidden></div>
           <p class="muted">Sen de hikayeni gönder: <a href="mailto:ornek.hikaye@gmail.com">ornek.hikaye@gmail.com</a></p>
+        </div>
+
+        <div class="card">
+          <h3>📈 İlerleme Grafikleri</h3>
+          <div class="grid two">
+            <div>
+              <div class="label">Son 7 Gün Check-in</div>
+              <div id="chartCheckins" class="chart"></div>
+            </div>
+            <div>
+              <div class="label">Son Dürtüler</div>
+              <div id="chartUrges" class="chart"></div>
+            </div>
+          </div>
+          <div style="margin-top:12px">
+            <div class="label">Başarı Oranı</div>
+            <div id="chartDonut" class="chart donut" style="height:180px"></div>
+          </div>
         </div>
       </section>
 
@@ -223,12 +241,35 @@
               </div>
             </div>
           </div>
-          <div class="card">
-            <h3>Son Ödemeler</h3>
-            <ul id="revenueList" class="list"></ul>
-          </div>
-        </div>
-      </section>
+                     <div class="card">
+             <h3>Son Ödemeler</h3>
+             <ul id="revenueList" class="list"></ul>
+           </div>
+
+           <div class="card admin-only">
+             <h3>İbretlik Hikayeler (Admin)</h3>
+             <div class="grid two">
+               <label class="field">Tür
+                 <select id="adminStoryType"><option value="video">Video</option><option value="text">Yazı</option></select>
+               </label>
+               <label class="field">Başlık
+                 <input id="adminStoryTitle" type="text" placeholder="Kısa başlık" />
+               </label>
+             </div>
+             <label class="field" id="adminStoryUrlField">URL
+               <input id="adminStoryUrl" type="url" placeholder="YouTube veya makale linki" />
+             </label>
+             <label class="field" id="adminStoryContentField" hidden>Metin
+               <textarea id="adminStoryContent" rows="3" placeholder="Kısa hikaye metni"></textarea>
+             </label>
+             <div class="actions">
+               <button id="adminAddStory" class="btn">Ekle</button>
+             </div>
+             <h4 style="margin-top:12px">Kayıtlı Hikayeler</h4>
+             <ul id="adminStoriesList" class="list"></ul>
+           </div>
+         </div>
+       </section>
 
       <section id="settings" class="panel" role="tabpanel">
         <div class="card">
