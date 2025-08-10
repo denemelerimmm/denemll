@@ -27,6 +27,7 @@
         <button class="tab auth-only" data-tab="triggers" role="tab" aria-selected="false">Tetikleyiciler</button>
         <button class="tab auth-only" data-tab="urge" role="tab" aria-selected="false">Dürtü Sayacı</button>
         <button class="tab auth-only" data-tab="support" role="tab" aria-selected="false">Destek</button>
+        <button class="tab auth-only admin-only" data-tab="admin" role="tab" aria-selected="false" title="Yalnızca admin">Admin</button>
         <button class="tab auth-only" data-tab="settings" role="tab" aria-selected="false" title="Ayarlar">⚙️</button>
       </nav>
 
@@ -182,6 +183,37 @@
           </label>
           <div class="actions">
             <button id="copySos" class="btn">Kopyala</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="admin" class="panel" role="tabpanel">
+        <div class="card">
+          <h2>Admin Paneli</h2>
+          <div class="grid two">
+            <div class="card">
+              <h3>Özet</h3>
+              <ul class="list">
+                <li><div><strong>Toplam Kullanıcı</strong></div><div><span id="mUsers">0</span></div></li>
+                <li><div><strong>Bugün Kayıt</strong></div><div><span id="mTodaySignups">0</span></div></li>
+                <li><div><strong>Online Kullanıcı</strong></div><div><span id="mOnline">0</span></div></li>
+                <li><div><strong>Toplam Ciro</strong></div><div><span id="mRevenue">₺0</span></div></li>
+              </ul>
+            </div>
+            <div class="card">
+              <h3>Test Ödemesi Ekle</h3>
+              <div class="grid two">
+                <label class="field">E-posta<input id="revEmail" type="email" placeholder="kullanici@site.com" /></label>
+                <label class="field">Tutar (₺)<input id="revAmount" type="number" min="0" step="0.01" /></label>
+              </div>
+              <div class="actions">
+                <button id="addRevenue" class="btn">Ekle</button>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Son Ödemeler</h3>
+            <ul id="revenueList" class="list"></ul>
           </div>
         </div>
       </section>

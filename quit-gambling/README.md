@@ -20,6 +20,8 @@ Ardından `http://localhost:8000` adresine gidin. Telefonunuzda ana ekrana ekley
 - Hızlı not ve acil durum mesajı
 - Veri dışa/içe aktarma (JSON)
 - PWA: manifest + service worker ile çevrimdışı
+- Giriş/Kayıt (yerel, SHA-256 hash), kullanıcıya özgü veri
+- Admin Paneli: toplam kullanıcı, bugün kayıt, online kullanıcı, toplam ciro; test ödemesi ekleme
 
 ## Not
 

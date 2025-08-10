@@ -16,6 +16,54 @@ function isLoggedIn(){ return !!auth.session.email }
 function saveAuth(){ storage.set('users', auth.users); storage.set('session', auth.session) }
 function keyFor(suffix){ return `${auth.session.email || 'guest'}:${suffix}` }
 
+// Extend auth with roles and presence
+auth.roles = storage.get('roles', {}) // { email: 'admin' | 'user' }
+auth.presence = storage.get('presence', {}) // { email: timestampISO }
+auth.revenue = storage.get('revenue', []) // [{email, amount, at}]
+function saveAdminStores(){ storage.set('roles', auth.roles); storage.set('presence', auth.presence); storage.set('revenue', auth.revenue) }
+
+// Mark current user online on activity
+function heartbeat(){ if(!isLoggedIn()) return; auth.presence[auth.session.email] = new Date().toISOString(); saveAdminStores(); renderAdmin() }
+['click','keydown','mousemove','touchstart','visibilitychange'].forEach(ev=>document.addEventListener(ev, heartbeat, { passive:true }))
+setInterval(heartbeat, 15000)
+
+function getMetrics(){
+  const users = auth.users.length
+  const today = new Date().toISOString().slice(0,10)
+  const todaySignups = auth.users.filter(u => (u.createdAt||'').slice(0,10) === today).length
+  const now = Date.now()
+  const online = Object.values(auth.presence).filter(ts => now - new Date(ts).getTime() < 60_000).length
+  const revenue = auth.revenue.reduce((s,r)=> s + Number(r.amount||0), 0)
+  return { users, todaySignups, online, revenue }
+}
+
+function renderAdmin(){
+  const m = getMetrics()
+  const fmt = (n)=> new Intl.NumberFormat('tr-TR', { style:'currency', currency:'TRY', maximumFractionDigits:2 }).format(n)
+  const MU=$('#mUsers'), MT=$('#mTodaySignups'), MO=$('#mOnline'), MR=$('#mRevenue')
+  if(MU) MU.textContent = String(m.users)
+  if(MT) MT.textContent = String(m.todaySignups)
+  if(MO) MO.textContent = String(m.online)
+  if(MR) MR.textContent = fmt(m.revenue)
+  const list = $('#revenueList'); if(list){ list.innerHTML=''; auth.revenue.slice(-20).reverse().forEach(r=>{ const li=document.createElement('li'); li.innerHTML=`<div><strong>${r.email}</strong><div class="meta">${new Date(r.at).toLocaleString('tr-TR')}</div></div><div>${fmt(r.amount)}</div>`; list.appendChild(li) }) }
+  // Admin-only visibility
+  const isAdmin = auth.roles[auth.session.email] === 'admin'
+  $$('.admin-only').forEach(el => el.classList.toggle('hidden', !isAdmin))
+}
+
+$('#addRevenue')?.addEventListener('click', () => {
+  const email = ($('#revEmail').value||'').trim().toLowerCase()
+  const amount = Number($('#revAmount').value||0)
+  if (!email || !(amount>0)) return
+  auth.revenue.push({ email, amount, at: new Date().toISOString() })
+  saveAdminStores(); renderAdmin()
+})
+
+// Ensure first registered user is admin
+if (auth.users.length>0 && !Object.values(auth.roles).some(r=>r==='admin')){
+  auth.roles[auth.users[0].email] = 'admin'; saveAdminStores()
+}
+
 // App state (per user)
 const state = {
   settings: { quitDate: '', dailyGoal: '', motivations: '' },
