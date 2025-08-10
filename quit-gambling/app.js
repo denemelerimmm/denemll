@@ -507,3 +507,43 @@ function renderAll(){ renderCheckins(); renderTriggers(); renderUrges(); updateD
 
 // Init
 hydrateFromStorage(); renderAll(); updateAuthUI(); updateTimer(); checkResetTokenOnLoad(); fetchStories();
+
+// API veri yükleme ve migrasyon
+async function loadAllFromApi(){
+  if (!API_BASE || !auth.apiToken) return
+  try{
+    const data = await api('/api/data')
+    // settings: { quit_date, daily_goal, motivations }
+    state.settings = {
+      quitDate: data.settings?.quit_date || '',
+      dailyGoal: data.settings?.daily_goal || '',
+      motivations: data.settings?.motivations || ''
+    }
+    state.notes = {
+      quick: data.notes?.quick || '',
+      sos: data.notes?.sos || ''
+    }
+    state.checkins = Array.isArray(data.checkins)? data.checkins.map(c=>({ date:c.date, success: c.success===1?true: (c.success===0?false:undefined), mood:c.mood||'', note:c.note||'' })) : []
+    state.triggers = Array.isArray(data.triggers)? data.triggers.map(t=>({ date: t.at, type:t.type, intensity:Number(t.intensity||0), note:t.note||'' })) : []
+    state.urges = Array.isArray(data.urges)? data.urges.map(u=>({ date:u.at, durationSec:Number(u.duration_sec||0) })) : []
+    saveAll(); renderAll()
+  }catch(e){ console.warn('loadAllFromApi failed', e) }
+}
+
+async function migrateIfNeeded(){
+  if (!API_BASE || !auth.apiToken) return
+  const migratedKey = keyFor('migratedToApi')
+  const already = storage.get(migratedKey, false)
+  if (already) return
+  try{
+    const payload = {
+      settings: state.settings,
+      notes: state.notes,
+      checkins: state.checkins,
+      triggers: state.triggers.map(t=>({ at: t.date, type:t.type, intensity:t.intensity, note:t.note })),
+      urges: state.urges.map(u=>({ at: u.date, durationSec: u.durationSec }))
+    }
+    await api('/api/migrate', { method:'POST', body: JSON.stringify(payload) })
+    storage.set(migratedKey, true)
+  }catch(e){ console.warn('migrateIfNeeded failed', e) }
+}
