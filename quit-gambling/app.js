@@ -365,7 +365,7 @@ function renderLine(containerId, values){
   const svg = svgEl('svg', { viewBox:`0 0 ${w} ${h}`, preserveAspectRatio:'none' })
   // gradient
   const defs = svgEl('defs'); const grad = svgEl('linearGradient',{id:'gradLine',x1:'0',x2:'1',y1:'0',y2:'0'})
-  grad.appendChild(svgEl('stop',{offset:'0%',stop-color:'#38bdf8'})); grad.appendChild(svgEl('stop',{offset:'100%',stop-color:'#22c55e'})); defs.appendChild(grad); svg.appendChild(defs)
+  grad.appendChild(svgEl('stop',{offset:'0%','stop-color':'#38bdf8'})); grad.appendChild(svgEl('stop',{offset:'100%','stop-color':'#22c55e'})); defs.appendChild(grad); svg.appendChild(defs)
   for(let i=0;i<4;i++){ const y=pad + (h-2*pad)*i/3; svg.appendChild(svgEl('line',{x1:pad,y1:y,x2:w-pad,y2:y,class:'gridline'})) }
   const n = values.length; const max = Math.max(1, ...values)
   const pts = values.map((v,i)=>{ const x=pad + (w-2*pad)*(i/(Math.max(1,n-1))); const y=h-pad - (h-2*pad)*(v/max); return [x,y] })
