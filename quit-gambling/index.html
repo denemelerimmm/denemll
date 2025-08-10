@@ -309,8 +309,24 @@
           </div>
           <div class="actions">
             <button id="loginBtn" class="btn">Giriş</button>
+            <button id="showForgot" class="btn ghost" type="button">Şifremi Unuttum</button>
           </div>
           <div id="loginError" class="hint error" hidden></div>
+          <div id="forgotBox" class="card" hidden>
+            <h3>Şifremi Unuttum</h3>
+            <label class="field">E-posta<input id="forgotEmail" type="email" placeholder="eposta@ornek.com" /></label>
+            <div class="actions"><button id="forgotBtn" class="btn">Gönder</button></div>
+            <div id="forgotMsg" class="hint" hidden>Bağlantı e‑posta adresine gönderildi (geliştirmede loga yazılır).</div>
+          </div>
+          <div id="resetBox" class="card" hidden>
+            <h3>Şifre Sıfırla</h3>
+            <div class="grid two">
+              <label class="field">Yeni Parola<input id="resetPass1" type="password" /></label>
+              <label class="field">Tekrar<input id="resetPass2" type="password" /></label>
+            </div>
+            <div class="actions"><button id="resetBtn" class="btn">Sıfırla</button></div>
+            <div id="resetMsg" class="hint" hidden>Şifreniz güncellendi. Giriş yapabilirsiniz.</div>
+          </div>
         </div>
       </section>
 
@@ -334,6 +350,7 @@
       <p>Veriler yalnızca bu cihazda saklanır (localStorage). PWA olarak yükleyebilir ve çevrimdışı kullanabilirsiniz.</p>
     </footer>
 
+    <script src="/config.js"></script>
     <script src="/app.js" type="module"></script>
     <script>
       if ('serviceWorker' in navigator) {

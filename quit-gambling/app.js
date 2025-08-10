@@ -119,13 +119,6 @@ $('#goToCheckin')?.addEventListener('click', () => selectTab('checkin'))
 
 function selectTab(id){ $$('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===id)); $$('.panel').forEach(p=>p.classList.toggle('active', p.id===id)) }
 
-function updateAuthUI(){
-  const logged = isLoggedIn()
-  $$('.guest-only').forEach(el => el.classList.toggle('hidden', logged))
-  $$('.auth-only').forEach(el => el.classList.toggle('hidden', !logged))
-  if (logged) { selectTab('dashboard') } else { selectTab('login') }
-}
-
 // Settings
 const quitDateInput = $('#quitDate')
 const dailyGoalInput = $('#dailyGoal')
@@ -167,9 +160,97 @@ $('#importData')?.addEventListener('change', async (e) => {
   } catch { alert('Geçersiz dosya.') }
 })
 
+// API helper
+const API_BASE = (window.APP_CONFIG && window.APP_CONFIG.API_BASE) || ''
+async function api(path, options={}){
+  if (!API_BASE) throw new Error('API_BASE yok')
+  const headers = { 'Content-Type': 'application/json', ...(auth.apiToken? { Authorization: `Bearer ${auth.apiToken}` } : {}) }
+  const res = await fetch(API_BASE + path, { ...options, headers })
+  const data = await res.json().catch(()=>({}))
+  if (!res.ok) throw new Error(data?.error || 'api_error')
+  return data
+}
+
+// Extend auth with API token/current user
+auth.apiToken = storage.get('api_token', '')
+auth.currentUser = storage.get('current_user', null)
+function setSession({ token, user }){ auth.apiToken = token; auth.currentUser = user; auth.session.email = user.email; saveAuth(); storage.set('api_token', token); storage.set('current_user', user) }
+function clearSession(){ auth.apiToken=''; auth.currentUser=null; auth.session.email=''; saveAuth(); storage.set('api_token',''); storage.set('current_user', null) }
+
+function isLoggedIn(){ return !!(auth.apiToken || auth.session.email) }
+
+function isAdmin(){ return (auth.currentUser && auth.currentUser.role==='admin') || auth.roles[auth.session.email]==='admin' }
+
+function updateAuthUI(){
+  const logged = isLoggedIn()
+  $$('.guest-only').forEach(el => el.classList.toggle('hidden', logged))
+  $$('.auth-only').forEach(el => el.classList.toggle('hidden', !logged))
+  $$('.admin-only').forEach(el => el.classList.toggle('hidden', !isAdmin()))
+  if (logged) { selectTab('dashboard') } else { selectTab('login') }
+}
+
+// Override login/register to use API when configured
+$('#loginBtn')?.addEventListener('click', async () => {
+  const email = ($('#loginEmail').value||'').trim().toLowerCase()
+  const pass = $('#loginPassword').value||''
+  const err = $('#loginError'); if(err){ err.hidden=true; err.textContent='' }
+  try{
+    if (API_BASE){
+      const data = await api('/api/auth/login', { method:'POST', body: JSON.stringify({ email, password: pass }) })
+      setSession(data)
+    } else {
+      const user = auth.users.find(u=>u.email===email)
+      const ok = user && user.passwordHash === await sha256(pass)
+      if (!ok) throw new Error('invalid_credentials')
+      auth.session.email = email; saveAuth()
+    }
+    hydrateFromStorage(); renderAll(); updateAuthUI()
+  }catch(e){ if(err){ err.textContent='E-posta veya parola hatalı.'; err.hidden=false } }
+})
+
+$('#registerBtn')?.addEventListener('click', async () => {
+  const email = ($('#registerEmail').value||'').trim().toLowerCase()
+  const p1 = $('#registerPassword').value||''
+  const p2 = $('#registerPassword2').value||''
+  const err = $('#registerError'); if(err){ err.hidden=true; err.textContent='' }
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ if(err){ err.textContent='Geçerli bir e-posta girin.'; err.hidden=false } return }
+  if (p1.length < 6){ if(err){ err.textContent='Parola en az 6 karakter olmalı.'; err.hidden=false } return }
+  if (p1 !== p2){ if(err){ err.textContent='Parolalar eşleşmiyor.'; err.hidden=false } return }
+  try{
+    if (API_BASE){
+      const data = await api('/api/auth/register', { method:'POST', body: JSON.stringify({ email, password: p1 }) })
+      setSession(data)
+    } else {
+      if (auth.users.some(u=>u.email===email)){ if(err){ err.textContent='Bu e-posta ile kayıt mevcut.'; err.hidden=false } return }
+      auth.users.push({ email, passwordHash: await sha256(p1), createdAt: new Date().toISOString() })
+      auth.session.email = email; saveAuth()
+    }
+    hydrateFromStorage(); saveAll(); renderAll(); updateAuthUI()
+  }catch(e){ if(err){ err.textContent = e.message==='email_exists'?'Bu e-posta kayıtlı.':'Kayıt başarısız.'; err.hidden=false } }
+})
+
+// Forgot/Reset
+$('#showForgot')?.addEventListener('click', ()=>{ const box=$('#forgotBox'); if(box) box.hidden = !box.hidden })
+$('#forgotBtn')?.addEventListener('click', async ()=>{
+  const email = ($('#forgotEmail').value||'').trim().toLowerCase()
+  const msg=$('#forgotMsg'); if(msg){ msg.hidden=true }
+  try{ await api('/api/auth/forgot',{ method:'POST', body: JSON.stringify({ email }) }); if(msg){ msg.hidden=false } }catch{}
+})
+
+function checkResetTokenOnLoad(){
+  if (!API_BASE) return
+  const url = new URL(location.href)
+  const token = url.searchParams.get('resetToken')
+  if (token){ selectTab('login'); const box=$('#resetBox'); if(box) box.hidden=false; $('#resetBtn')?.addEventListener('click', async ()=>{
+      const p1=$('#resetPass1').value||''; const p2=$('#resetPass2').value||''; const msg=$('#resetMsg')
+      if (p1.length<6 || p1!==p2) return
+      try{ await api('/api/auth/reset',{ method:'POST', body: JSON.stringify({ token, password: p1 }) }); if(msg){ msg.hidden=false } }catch{}
+    })
+  }
+}
+
 $('#logoutBtn')?.addEventListener('click', () => {
-  auth.session.email = ''
-  saveAuth(); hydrateFromStorage(); renderAll(); updateAuthUI()
+  clearSession(); hydrateFromStorage(); renderAll(); updateAuthUI()
 })
 
 // Quick note & SOS
@@ -283,17 +364,53 @@ $('#adminStoryType')?.addEventListener('change', ()=>{
   $('#adminStoryContentField').hidden = t!=='text'
 })
 
-$('#adminAddStory')?.addEventListener('click', () => {
+// Admin metrics via API when possible
+async function renderAdmin(){
+  try{
+    if (API_BASE && auth.apiToken){
+      const m = await api('/api/admin/metrics')
+      const fmt = (n)=> new Intl.NumberFormat('tr-TR', { style:'currency', currency:'TRY', maximumFractionDigits:2 }).format(n)
+      const MU=$('#mUsers'), MT=$('#mTodaySignups'), MO=$('#mOnline'), MR=$('#mRevenue')
+      if(MU) MU.textContent = String(m.users)
+      if(MT) MT.textContent = String(m.todaySignups)
+      if(MO) MO.textContent = String(m.online)
+      if(MR) MR.textContent = fmt(m.revenue)
+    }
+  }catch{}
+  const isAdminFlag = isAdmin(); $$('.admin-only').forEach(el => el.classList.toggle('hidden', !isAdminFlag))
+  if (isAdminFlag) renderAdminStories()
+}
+
+// Stories from API
+async function fetchStories(){
+  try{
+    if (API_BASE){ const res = await api('/api/stories'); globalStore.stories = res.stories || []; renderStories(); if(isAdmin()) renderAdminStories() }
+  }catch{}
+}
+
+// Admin add/delete stories via API
+$('#adminAddStory')?.addEventListener('click', async (e)=>{
+  if (!isAdmin()) return
+  e.stopImmediatePropagation()
   const type = $('#adminStoryType').value
   const title = ($('#adminStoryTitle').value||'').trim()
   const url = ($('#adminStoryUrl').value||'').trim()
   const content = ($('#adminStoryContent').value||'').trim()
-  if (type==='video' && !url) return
-  if (type==='text' && !content) return
-  const id = (crypto.randomUUID && crypto.randomUUID()) || String(Date.now())
-  globalStore.stories.unshift({ id, type, title, url, content, addedAt: new Date().toISOString(), by: auth.session.email })
-  saveGlobal(); renderAdminStories(); renderStories(); $('#adminStoryTitle').value=''; $('#adminStoryUrl').value=''; $('#adminStoryContent').value=''
+  try{
+    if (API_BASE && auth.apiToken){ await api('/api/stories',{ method:'POST', body: JSON.stringify({ type, title, url, content }) }); await fetchStories() }
+    else { // fallback local
+      const id = (crypto.randomUUID && crypto.randomUUID()) || String(Date.now())
+      globalStore.stories.unshift({ id, type, title, url, content, addedAt: new Date().toISOString(), by: auth.session.email }); saveGlobal(); renderAdminStories(); renderStories()
+    }
+  }catch{}
 })
+
+function bindDeleteStoryButtons(){
+  $$('[data-del-story]')?.forEach(btn=> btn.addEventListener('click', async () => {
+    const id = btn.getAttribute('data-del-story')
+    try{ if (API_BASE && auth.apiToken){ await api('/api/stories/'+id,{ method:'DELETE' }); await fetchStories() } else { globalStore.stories = globalStore.stories.filter(s=>s.id!==id); saveGlobal(); renderAdminStories(); renderStories() } }catch{}
+  }))
+}
 
 function renderAdminStories(){
   const list = $('#adminStoriesList'); if(!list) return; list.innerHTML=''
@@ -307,11 +424,7 @@ function renderAdminStories(){
     <div class="actions"><button class="btn ghost" data-del-story="${s.id}">Sil</button></div>`
     list.appendChild(li)
   })
-  $$('[data-del-story]')?.forEach(btn=> btn.addEventListener('click', () => {
-    const id = btn.getAttribute('data-del-story')
-    globalStore.stories = globalStore.stories.filter(s=>s.id!==id)
-    saveGlobal(); renderAdminStories(); renderStories()
-  }))
+  bindDeleteStoryButtons()
 }
 
 // Stories UI events
@@ -408,29 +521,5 @@ function renderCharts(){
 
 function renderAll(){ renderCheckins(); renderTriggers(); renderUrges(); updateDashboard(); loadSettingsUI(); renderStories(); renderCharts() }
 
-// Auth events
-$('#loginBtn')?.addEventListener('click', async () => {
-  const email = ($('#loginEmail').value||'').trim().toLowerCase()
-  const pass = $('#loginPassword').value||''
-  const err = $('#loginError'); if(err){ err.hidden=true; err.textContent='' }
-  const user = auth.users.find(u=>u.email===email)
-  const ok = user && user.passwordHash === await sha256(pass)
-  if (!ok){ if(err){ err.textContent='E-posta veya parola hatalı.'; err.hidden=false } return }
-  auth.session.email = email; saveAuth(); hydrateFromStorage(); renderAll(); updateAuthUI()
-})
-
-$('#registerBtn')?.addEventListener('click', async () => {
-  const email = ($('#registerEmail').value||'').trim().toLowerCase()
-  const p1 = $('#registerPassword').value||''
-  const p2 = $('#registerPassword2').value||''
-  const err = $('#registerError'); if(err){ err.hidden=true; err.textContent='' }
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ if(err){ err.textContent='Geçerli bir e-posta girin.'; err.hidden=false } return }
-  if (p1.length < 6){ if(err){ err.textContent='Parola en az 6 karakter olmalı.'; err.hidden=false } return }
-  if (p1 !== p2){ if(err){ err.textContent='Parolalar eşleşmiyor.'; err.hidden=false } return }
-  if (auth.users.some(u=>u.email===email)){ if(err){ err.textContent='Bu e-posta ile kayıt mevcut.'; err.hidden=false } return }
-  auth.users.push({ email, passwordHash: await sha256(p1), createdAt: new Date().toISOString() })
-  auth.session.email = email; saveAuth(); hydrateFromStorage(); saveAll(); renderAll(); updateAuthUI()
-})
-
 // Init
-hydrateFromStorage(); renderAll(); updateAuthUI(); updateTimer()
+hydrateFromStorage(); renderAll(); updateAuthUI(); updateTimer(); checkResetTokenOnLoad(); fetchStories();
