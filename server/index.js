@@ -71,6 +71,9 @@ const LoginSchema = z.object({ email: z.string().email(), password: z.string().m
 const ForgotSchema = z.object({ email: z.string().email() })
 const ResetSchema = z.object({ token: z.string().min(10), password: z.string().min(6) })
 
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean)
+function isAdminEmail(email){ return ADMIN_EMAILS.includes(String(email||'').toLowerCase()) }
+
 // Routes
 app.get('/health', (req,res)=> res.json({ ok:true }))
 
@@ -81,7 +84,7 @@ app.post('/api/auth/register', (req,res)=>{
   const exists = db.prepare('SELECT id FROM users WHERE email = ?').get(email)
   if (exists) return res.status(409).json({ error: 'email_exists' })
   const hash = bcrypt.hashSync(password, 10)
-  const role = db.prepare('SELECT COUNT(*) as c FROM users').get().c === 0 ? 'admin' : 'user'
+  const role = isAdminEmail(email) ? 'admin' : 'user'
   const info = db.prepare('INSERT INTO users (email, password_hash, role, created_at) VALUES (?, ?, ?, ?)').run(email, hash, role, new Date().toISOString())
   const token = createToken({ id: info.lastInsertRowid, email, role })
   res.json({ token, user: { id: info.lastInsertRowid, email, role } })
@@ -95,6 +98,8 @@ app.post('/api/auth/login', (req,res)=>{
   if (!user) return res.status(401).json({ error: 'invalid_credentials' })
   const ok = bcrypt.compareSync(password, user.password_hash)
   if (!ok) return res.status(401).json({ error: 'invalid_credentials' })
+  const shouldRole = isAdminEmail(email) ? 'admin' : 'user'
+  if (user.role !== shouldRole) { db.prepare('UPDATE users SET role = ? WHERE id = ?').run(shouldRole, user.id); user.role = shouldRole }
   const token = createToken({ id: user.id, email: user.email, role: user.role })
   res.json({ token, user: { id: user.id, email: user.email, role: user.role } })
 })

@@ -47,10 +47,6 @@ $('#addRevenue')?.addEventListener('click', () => {
   saveAdminStores(); renderAdmin()
 })
 
-// Ensure first registered user is admin
-if (auth.users.length>0 && !Object.values(auth.roles).some(r=>r==='admin')){
-  auth.roles[auth.users[0].email] = 'admin'; saveAdminStores()
-}
 
 // App state (per user)
 const state = {
