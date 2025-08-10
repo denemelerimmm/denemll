@@ -39,6 +39,50 @@ CREATE TABLE IF NOT EXISTS password_resets (
 );
 `)
 
+// Data tables
+db.exec(`
+CREATE TABLE IF NOT EXISTS user_settings (
+  user_id INTEGER PRIMARY KEY,
+  quit_date TEXT,
+  daily_goal TEXT,
+  motivations TEXT,
+  FOREIGN KEY(user_id) REFERENCES users(id)
+);
+CREATE TABLE IF NOT EXISTS user_notes (
+  user_id INTEGER PRIMARY KEY,
+  quick TEXT,
+  sos TEXT,
+  FOREIGN KEY(user_id) REFERENCES users(id)
+);
+CREATE TABLE IF NOT EXISTS checkins (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  date TEXT NOT NULL,
+  success INTEGER,
+  mood TEXT,
+  note TEXT,
+  created_at TEXT NOT NULL,
+  UNIQUE(user_id, date),
+  FOREIGN KEY(user_id) REFERENCES users(id)
+);
+CREATE TABLE IF NOT EXISTS triggers (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  at TEXT NOT NULL,
+  type TEXT NOT NULL,
+  intensity INTEGER NOT NULL,
+  note TEXT,
+  FOREIGN KEY(user_id) REFERENCES users(id)
+);
+CREATE TABLE IF NOT EXISTS urges (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  at TEXT NOT NULL,
+  duration_sec INTEGER NOT NULL,
+  FOREIGN KEY(user_id) REFERENCES users(id)
+);
+`)
+
 // Mailer
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
@@ -63,6 +107,12 @@ function authMiddleware(req,res,next){
   const token = h.startsWith('Bearer ')? h.slice(7): ''
   if (!token) return res.status(401).json({ error: 'unauthorized' })
   try { req.user = jwt.verify(token, JWT_SECRET); next() } catch { return res.status(401).json({ error: 'invalid_token' }) }
+}
+
+function requireUser(req){
+  const u = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id)
+  if (!u) throw new Error('no_user')
+  return u
 }
 
 // Schemas
@@ -131,17 +181,115 @@ app.post('/api/auth/reset', (req,res)=>{
   res.json({ ok:true })
 })
 
-// Admin metrics
-app.get('/api/admin/metrics', authMiddleware, (req,res)=>{
-  if (req.user.role !== 'admin') return res.status(403).json({ error: 'forbidden' })
-  const users = db.prepare('SELECT COUNT(*) as c FROM users').get().c
-  const today = new Date().toISOString().slice(0,10)
-  const todaySignups = db.prepare("SELECT COUNT(*) as c FROM users WHERE substr(created_at,1,10)=?").get(today).c
-  // Online not tracked here in DB; set to 0 for now or could implement
-  const online = 0
-  // Revenue not implemented in DB; return 0 to avoid breaking UI
-  const revenue = 0
-  res.json({ users, todaySignups, online, revenue })
+// Settings
+app.get('/api/settings', authMiddleware, (req,res)=>{
+  const row = db.prepare('SELECT quit_date, daily_goal, motivations FROM user_settings WHERE user_id = ?').get(req.user.id)
+  res.json({ settings: row || { quit_date:null, daily_goal:null, motivations:null } })
+})
+app.post('/api/settings', authMiddleware, (req,res)=>{
+  const body = req.body||{}
+  db.prepare('INSERT INTO user_settings (user_id, quit_date, daily_goal, motivations) VALUES (?, ?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET quit_date=excluded.quit_date,daily_goal=excluded.daily_goal,motivations=excluded.motivations').run(req.user.id, body.quitDate||null, body.dailyGoal||null, body.motivations||null)
+  res.json({ ok:true })
+})
+
+// Notes
+app.get('/api/notes', authMiddleware, (req,res)=>{
+  const row = db.prepare('SELECT quick, sos FROM user_notes WHERE user_id = ?').get(req.user.id)
+  res.json({ notes: row || { quick:'', sos:'' } })
+})
+app.post('/api/notes', authMiddleware, (req,res)=>{
+  const body = req.body||{}
+  db.prepare('INSERT INTO user_notes (user_id, quick, sos) VALUES (?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET quick=excluded.quick,sos=excluded.sos').run(req.user.id, body.quick||'', body.sos||'')
+  res.json({ ok:true })
+})
+
+// Checkins
+app.get('/api/checkins', authMiddleware, (req,res)=>{
+  const limit = Math.min(365, Number(req.query.limit||90))
+  const rows = db.prepare('SELECT date, success, mood, note FROM checkins WHERE user_id = ? ORDER BY date DESC LIMIT ?').all(req.user.id, limit)
+  res.json({ checkins: rows })
+})
+app.post('/api/checkins', authMiddleware, (req,res)=>{
+  const b = req.body||{}
+  const date = b.date || new Date().toISOString().slice(0,10)
+  const success = (b.success===true?1:(b.success===false?0:null))
+  const mood = b.mood||null
+  const note = b.note||null
+  db.prepare('INSERT INTO checkins (user_id, date, success, mood, note, created_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(user_id,date) DO UPDATE SET success=coalesce(excluded.success, checkins.success), mood=coalesce(excluded.mood, checkins.mood), note=coalesce(excluded.note, checkins.note)').run(req.user.id, date, success, mood, note, new Date().toISOString())
+  res.json({ ok:true })
+})
+
+// Triggers
+app.get('/api/triggers', authMiddleware, (req,res)=>{
+  const limit = Math.min(200, Number(req.query.limit||100))
+  const rows = db.prepare('SELECT at, type, intensity, note FROM triggers WHERE user_id = ? ORDER BY at DESC LIMIT ?').all(req.user.id, limit)
+  res.json({ triggers: rows })
+})
+app.post('/api/triggers', authMiddleware, (req,res)=>{
+  const b = req.body||{}
+  const at = b.at || new Date().toISOString()
+  const type = b.type||'Diğer'
+  const intensity = Number(b.intensity||0)
+  const note = b.note||null
+  db.prepare('INSERT INTO triggers (user_id, at, type, intensity, note) VALUES (?, ?, ?, ?, ?)').run(req.user.id, at, type, intensity, note)
+  res.json({ ok:true })
+})
+
+// Urges
+app.get('/api/urges', authMiddleware, (req,res)=>{
+  const limit = Math.min(200, Number(req.query.limit||100))
+  const rows = db.prepare('SELECT at, duration_sec FROM urges WHERE user_id = ? ORDER BY at DESC LIMIT ?').all(req.user.id, limit)
+  res.json({ urges: rows })
+})
+app.post('/api/urges', authMiddleware, (req,res)=>{
+  const b = req.body||{}
+  const at = b.at || new Date().toISOString()
+  const duration = Math.max(0, Number(b.durationSec||0))
+  db.prepare('INSERT INTO urges (user_id, at, duration_sec) VALUES (?, ?, ?)').run(req.user.id, at, duration)
+  res.json({ ok:true })
+})
+
+// Bundle data
+app.get('/api/data', authMiddleware, (req,res)=>{
+  const settings = db.prepare('SELECT quit_date, daily_goal, motivations FROM user_settings WHERE user_id = ?').get(req.user.id) || { quit_date:null, daily_goal:null, motivations:null }
+  const notes = db.prepare('SELECT quick, sos FROM user_notes WHERE user_id = ?').get(req.user.id) || { quick:'', sos:'' }
+  const checkins = db.prepare('SELECT date, success, mood, note FROM checkins WHERE user_id = ? ORDER BY date DESC LIMIT 180').all(req.user.id)
+  const triggers = db.prepare('SELECT at, type, intensity, note FROM triggers WHERE user_id = ? ORDER BY at DESC LIMIT 200').all(req.user.id)
+  const urges = db.prepare('SELECT at, duration_sec FROM urges WHERE user_id = ? ORDER BY at DESC LIMIT 200').all(req.user.id)
+  res.json({ settings, notes, checkins, triggers, urges })
+})
+
+// Migrate
+app.post('/api/migrate', authMiddleware, (req,res)=>{
+  const b = req.body||{}
+  if (b.settings) db.prepare('INSERT INTO user_settings (user_id, quit_date, daily_goal, motivations) VALUES (?, ?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET quit_date=excluded.quit_date,daily_goal=excluded.daily_goal,motivations=excluded.motivations').run(req.user.id, b.settings.quitDate||null, b.settings.dailyGoal||null, b.settings.motivations||null)
+  if (b.notes) db.prepare('INSERT INTO user_notes (user_id, quick, sos) VALUES (?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET quick=excluded.quick,sos=excluded.sos').run(req.user.id, b.notes.quick||'', b.notes.sos||'')
+  if (Array.isArray(b.checkins)){
+    const stmt = db.prepare('INSERT INTO checkins (user_id, date, success, mood, note, created_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(user_id,date) DO UPDATE SET success=coalesce(excluded.success, checkins.success), mood=coalesce(excluded.mood, checkins.mood), note=coalesce(excluded.note, checkins.note)')
+    const now = new Date().toISOString()
+    db.transaction((rows)=>{ for(const c of rows){ stmt.run(req.user.id, c.date, (c.success===true?1:(c.success===false?0:null)), c.mood||null, c.note||null, now) } })(b.checkins)
+  }
+  if (Array.isArray(b.triggers)){
+    const stmt = db.prepare('INSERT INTO triggers (user_id, at, type, intensity, note) VALUES (?, ?, ?, ?, ?)')
+    db.transaction((rows)=>{ for(const t of rows){ stmt.run(req.user.id, t.date||t.at||new Date().toISOString(), t.type||'Diğer', Number(t.intensity||0), t.note||null) } })(b.triggers)
+  }
+  if (Array.isArray(b.urges)){
+    const stmt = db.prepare('INSERT INTO urges (user_id, at, duration_sec) VALUES (?, ?, ?)')
+    db.transaction((rows)=>{ for(const u of rows){ stmt.run(req.user.id, u.date||u.at||new Date().toISOString(), Number(u.durationSec||u.duration_sec||0)) } })(b.urges)
+  }
+  res.json({ ok:true })
+})
+
+// Stats
+app.get('/api/stats', authMiddleware, (req,res)=>{
+  const today = new Date(); const dates=[]; for(let i=6;i>=0;i--){ const d=new Date(today); d.setDate(today.getDate()-i); dates.push(d.toISOString().slice(0,10)) }
+  const map = Object.fromEntries(dates.map(d=>[d,null]))
+  db.prepare('SELECT date, success FROM checkins WHERE user_id = ? AND date >= ?').all(req.user.id, dates[0]).forEach(r=>{ map[r.date] = r.success })
+  const checkins7 = dates.map(d=> map[d])
+  const urges = db.prepare('SELECT duration_sec FROM urges WHERE user_id = ? ORDER BY at DESC LIMIT 7').all(req.user.id).map(r=>r.duration_sec)
+  const total = db.prepare('SELECT COUNT(*) as c FROM checkins WHERE user_id = ?').get(req.user.id).c
+  const success = db.prepare('SELECT COUNT(*) as c FROM checkins WHERE user_id = ? AND success = 1').get(req.user.id).c
+  res.json({ checkins7, urges: urges.reverse(), success, total })
 })
 
 // Stories (global)
