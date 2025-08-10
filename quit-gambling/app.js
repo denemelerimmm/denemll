@@ -12,7 +12,7 @@ const auth = {
   session: storage.get('session', { email: '' })
 }
 
-function isLoggedIn(){ return !!auth.session.email }
+/* legacy isLoggedIn removed; using API-aware isLoggedIn defined below */
 function saveAuth(){ storage.set('users', auth.users); storage.set('session', auth.session) }
 function keyFor(suffix){ return `${auth.session.email || 'guest'}:${suffix}` }
 
@@ -37,19 +37,7 @@ function getMetrics(){
   return { users, todaySignups, online, revenue }
 }
 
-function renderAdmin(){
-  const m = getMetrics()
-  const fmt = (n)=> new Intl.NumberFormat('tr-TR', { style:'currency', currency:'TRY', maximumFractionDigits:2 }).format(n)
-  const MU=$('#mUsers'), MT=$('#mTodaySignups'), MO=$('#mOnline'), MR=$('#mRevenue')
-  if(MU) MU.textContent = String(m.users)
-  if(MT) MT.textContent = String(m.todaySignups)
-  if(MO) MO.textContent = String(m.online)
-  if(MR) MR.textContent = fmt(m.revenue)
-  const list = $('#revenueList'); if(list){ list.innerHTML=''; auth.revenue.slice(-20).reverse().forEach(r=>{ const li=document.createElement('li'); li.innerHTML=`<div><strong>${r.email}</strong><div class="meta">${new Date(r.at).toLocaleString('tr-TR')}</div></div><div>${fmt(r.amount)}</div>`; list.appendChild(li) }) }
-  const isAdmin = auth.roles[auth.session.email] === 'admin'
-  $$('.admin-only').forEach(el => el.classList.toggle('hidden', !isAdmin))
-  if (isAdmin) renderAdminStories()
-}
+/* legacy renderAdmin replaced by API-aware version below */
 
 $('#addRevenue')?.addEventListener('click', () => {
   const email = ($('#revEmail').value||'').trim().toLowerCase()
