@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Kumar Bırak – Yol Arkadaşın</title>
+    <meta name="description" content="Kumar bırakma yolculuğunda tetikleyici günlüğü, dürtü sayacı, günlük yoklama ve acil destek ile yanınızda." />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#0f172a" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icon.svg" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="container">
+      <h1>🎯 Kumar Bırak</h1>
+      <p class="muted">Bugün de bir adım. Sürdür, güçlen, kaydet.</p>
+    </header>
+
+    <main class="container">
+      <nav class="tabs" role="tablist" aria-label="Bölümler">
+        <button class="tab guest-only active" data-tab="login" role="tab" aria-selected="true">Giriş</button>
+        <button class="tab guest-only" data-tab="register" role="tab" aria-selected="false">Kayıt</button>
+
+        <button class="tab auth-only" data-tab="dashboard" role="tab" aria-selected="false">Genel Bakış</button>
+        <button class="tab auth-only" data-tab="checkin" role="tab" aria-selected="false">Günlük Yoklama</button>
+        <button class="tab auth-only" data-tab="triggers" role="tab" aria-selected="false">Tetikleyiciler</button>
+        <button class="tab auth-only" data-tab="urge" role="tab" aria-selected="false">Dürtü Sayacı</button>
+        <button class="tab auth-only" data-tab="support" role="tab" aria-selected="false">Destek</button>
+        <button class="tab auth-only admin-only" data-tab="admin" role="tab" aria-selected="false" title="Yalnızca admin">Admin</button>
+        <button class="tab auth-only" data-tab="settings" role="tab" aria-selected="false" title="Ayarlar">⚙️</button>
+      </nav>
+
+      <section id="dashboard" class="panel active" role="tabpanel">
+        <div class="card">
+          <h2>İlerleme</h2>
+          <div class="stats">
+            <div>
+              <div class="stat" id="streakDays">0</div>
+              <div class="label">Günlük Seri</div>
+            </div>
+            <div>
+              <div class="stat" id="daysSinceQuit">0</div>
+              <div class="label">Bıraktığın Gün</div>
+            </div>
+            <div>
+              <div class="stat" id="checkinsThisWeek">0</div>
+              <div class="label">Bu Hafta Yoklama</div>
+            </div>
+          </div>
+          <div class="muted">Bırakış Tarihi: <span id="quitDateDisplay">-</span></div>
+          <div class="actions"><label class="field">Tarihi Güncelle<input id="quitDateDash" type="date" /></label><button id="saveQuitDateDash" class="btn ghost">Güncelle</button></div>
+        </div>
+
+        <div class="grid">
+          <div class="card">
+            <h3>Bugünün Hedefi</h3>
+            <p id="todayGoalText" class="muted">Ayarlar'dan hedef belirleyin.</p>
+            <button id="goToCheckin" class="btn">Günlük yoklama yap</button>
+          </div>
+          <div class="card">
+            <h3>Son Dürtü</h3>
+            <p class="muted" id="lastUrgeInfo">Henüz kayıt yok.</p>
+            <button data-tab-jump="urge" class="btn ghost">Dürtü sayacına git</button>
+          </div>
+          <div class="card">
+            <h3>Hızlı Not</h3>
+            <textarea id="quickNote" rows="3" placeholder="Kendine kısa bir not yaz..."></textarea>
+            <div class="actions">
+              <button id="saveQuickNote" class="btn">Kaydet</button>
+              <button id="clearQuickNote" class="btn danger ghost">Temizle</button>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h3>İbretlik Hikayeler</h3>
+          <div class="tabs" role="tablist">
+            <button class="tab small" data-stories-tab="video">🎬 Videolar</button>
+            <button class="tab small" data-stories-tab="text">📝 Yazılar</button>
+          </div>
+          <div id="storiesVideo" class="stories"></div>
+          <div id="storiesText" class="stories" hidden></div>
+          <p class="muted">Sen de hikayeni gönder: <a href="mailto:ornek.hikaye@gmail.com">ornek.hikaye@gmail.com</a></p>
+        </div>
+
+        <div class="card">
+          <h3>📈 İlerleme Grafikleri</h3>
+          <div class="grid two">
+            <div>
+              <div class="label">Son 7 Gün Check-in</div>
+              <div id="chartCheckins" class="chart"></div>
+            </div>
+            <div>
+              <div class="label">Son Dürtüler</div>
+              <div id="chartUrges" class="chart"></div>
+            </div>
+          </div>
+          <div style="margin-top:12px">
+            <div class="label">Başarı Oranı</div>
+            <div id="chartDonut" class="chart donut" style="height:180px"></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="checkin" class="panel" role="tabpanel">
+        <div class="card">
+          <h2>Günlük Yoklama</h2>
+          <p class="muted">Bugün hedefe bağlı kaldın mı?</p>
+          <div class="actions">
+            <button class="btn success" data-checkin="yes">Evet</button>
+            <button class="btn danger" data-checkin="no">Hayır</button>
+          </div>
+          <div class="spacer"></div>
+          <h3>Kısa Değerlendirme</h3>
+          <label class="field">
+            Duygu durumun
+            <select id="mood">
+              <option value="">Seç…</option>
+              <option>Çok iyi</option>
+              <option>İyi</option>
+              <option>Orta</option>
+              <option>Zor</option>
+              <option>Çok zor</option>
+            </select>
+          </label>
+          <label class="field">
+            Not
+            <textarea id="checkinNote" rows="3" placeholder="Kısaca özetle…"></textarea>
+          </label>
+          <div class="actions">
+            <button id="saveCheckin" class="btn">Kaydet</button>
+          </div>
+          <div id="checkinSaved" class="hint" hidden>Kaydedildi ✓</div>
+        </div>
+
+        <div class="card">
+          <h3>Geçmiş</h3>
+          <ul id="checkinHistory" class="list"></ul>
+        </div>
+      </section>
+
+      <section id="triggers" class="panel" role="tabpanel">
+        <div class="card">
+          <h2>Tetikleyici Günlüğü</h2>
+          <div class="grid two">
+            <label class="field">
+              Tür
+              <select id="triggerType">
+                <option>Stres</option>
+                <option>Can sıkıntısı</option>
+                <option>Yalnızlık</option>
+                <option>Arkadaş ortamı</option>
+                <option>Para</option>
+                <option>Diğer</option>
+              </select>
+            </label>
+            <label class="field">
+              Şiddet
+              <input id="triggerIntensity" type="range" min="1" max="10" value="5" />
+            </label>
+          </div>
+          <label class="field">
+            Not
+            <textarea id="triggerNote" rows="2" placeholder="Ne oldu, nasıl hissettin?"></textarea>
+          </label>
+          <div class="actions">
+            <button id="addTrigger" class="btn">Ekle</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Kayıtlar</h3>
+          <ul id="triggerList" class="list"></ul>
+        </div>
+      </section>
+
+      <section id="urge" class="panel" role="tabpanel">
+        <div class="card">
+          <h2>Dürtü Sayacı</h2>
+          <p class="muted">Zorlandığında 5 dakikalık sayaç ve nefes döngüsü ile bekle. Dürtüler dalga gibidir, geçer.</p>
+          <div class="timer" id="urgeTimer">05:00</div>
+          <div class="actions">
+            <button id="startUrge" class="btn">Başlat</button>
+            <button id="stopUrge" class="btn danger ghost">Durdur</button>
+            <button id="resetUrge" class="btn ghost">Sıfırla</button>
+          </div>
+          <div id="breath" class="breath" aria-label="Nefes" title="4-4-4-4 nefes">
+            <div class="circle"></div>
+          </div>
+          <div class="actions">
+            <button id="logUrge" class="btn">Dürtüyü kaydet</button>
+          </div>
+          <div class="hint" id="urgeHint">Hazır olduğunda başlat.</div>
+        </div>
+
+        <div class="card">
+          <h3>Son Kayıtlar</h3>
+          <ul id="urgeHistory" class="list"></ul>
+        </div>
+      </section>
+
+      <section id="support" class="panel" role="tabpanel">
+        <div class="card">
+          <h2>Destek ve Kaynaklar</h2>
+          <ul class="links">
+            <li><a target="_blank" rel="noopener" href="https://www.yesilay.org.tr">Yeşilay</a></li>
+            <li><a target="_blank" rel="noopener" href="https://alo191.saglik.gov.tr">ALO 191 Danışma</a></li>
+            <li><a target="_blank" rel="noopener" href="https://www.gamblersanonymous.org/ga/">Gamblers Anonymous</a></li>
+          </ul>
+          <label class="field">
+            Acil durum mesajın
+            <textarea id="sosMessage" rows="2" placeholder="Zorlandığımda kendime okuyacağım cümle…"></textarea>
+          </label>
+          <div class="actions">
+            <button id="copySos" class="btn">Kopyala</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="admin" class="panel" role="tabpanel">
+        <div class="card">
+          <h2>Admin Paneli</h2>
+          <div class="grid two">
+            <div class="card">
+              <h3>Özet</h3>
+              <ul class="list">
+                <li><div><strong>Toplam Kullanıcı</strong></div><div><span id="mUsers">0</span></div></li>
+                <li><div><strong>Bugün Kayıt</strong></div><div><span id="mTodaySignups">0</span></div></li>
+                <li><div><strong>Online Kullanıcı</strong></div><div><span id="mOnline">0</span></div></li>
+                <li><div><strong>Toplam Ciro</strong></div><div><span id="mRevenue">₺0</span></div></li>
+              </ul>
+            </div>
+            <div class="card">
+              <h3>Test Ödemesi Ekle</h3>
+              <div class="grid two">
+                <label class="field">E-posta<input id="revEmail" type="email" placeholder="kullanici@site.com" /></label>
+                <label class="field">Tutar (₺)<input id="revAmount" type="number" min="0" step="0.01" /></label>
+              </div>
+              <div class="actions">
+                <button id="addRevenue" class="btn">Ekle</button>
+              </div>
+            </div>
+          </div>
+                     <div class="card">
+             <h3>Son Ödemeler</h3>
+             <ul id="revenueList" class="list"></ul>
+           </div>
+
+           <div class="card admin-only">
+             <h3>İbretlik Hikayeler (Admin)</h3>
+             <div class="grid two">
+               <label class="field">Tür
+                 <select id="adminStoryType"><option value="video">Video</option><option value="text">Yazı</option></select>
+               </label>
+               <label class="field">Başlık
+                 <input id="adminStoryTitle" type="text" placeholder="Kısa başlık" />
+               </label>
+             </div>
+             <label class="field" id="adminStoryUrlField">URL
+               <input id="adminStoryUrl" type="url" placeholder="YouTube veya makale linki" />
+             </label>
+             <label class="field" id="adminStoryContentField" hidden>Metin
+               <textarea id="adminStoryContent" rows="3" placeholder="Kısa hikaye metni"></textarea>
+             </label>
+             <div class="actions">
+               <button id="adminAddStory" class="btn">Ekle</button>
+             </div>
+             <h4 style="margin-top:12px">Kayıtlı Hikayeler</h4>
+             <ul id="adminStoriesList" class="list"></ul>
+           </div>
+         </div>
+       </section>
+
+      <section id="settings" class="panel" role="tabpanel">
+        <div class="card">
+          <h2>Ayarlar</h2>
+          <div class="grid two">
+            <label class="field">
+              Bırakış tarihi
+              <input id="quitDate" type="date" />
+            </label>
+            <label class="field">
+              Günlük hedef
+              <input id="dailyGoal" type="text" placeholder="Örn. 'Bugün kumar yok'" />
+            </label>
+          </div>
+          <label class="field">
+            Motivasyon cümlelerin
+            <textarea id="motivations" rows="3" placeholder="Neden bırakıyorsun? Kendine hatırlat…"></textarea>
+          </label>
+          <div class="actions">
+            <button id="saveSettings" class="btn">Kaydet</button>
+            <button id="exportData" class="btn ghost">Veriyi dışa aktar</button>
+            <label class="btn ghost file">
+              Veriyi içe aktar
+              <input id="importData" type="file" accept="application/json" />
+            </label>
+            <button id="logoutBtn" class="btn danger">Çıkış Yap</button>
+          </div>
+          <div id="settingsSaved" class="hint" hidden>Kaydedildi ✓</div>
+        </div>
+      </section>
+      <section id="login" class="panel" role="tabpanel">
+        <div class="card">
+          <h2>Giriş Yap</h2>
+          <div class="grid two">
+            <label class="field">E-posta<input id="loginEmail" type="email" autocomplete="username" /></label>
+            <label class="field">Parola<input id="loginPassword" type="password" autocomplete="current-password" /></label>
+          </div>
+          <div class="actions">
+            <button id="loginBtn" class="btn">Giriş</button>
+            <button id="showForgot" class="btn ghost" type="button">Şifremi Unuttum</button>
+          </div>
+          <div id="loginError" class="hint error" hidden></div>
+          <div id="forgotBox" class="card" hidden>
+            <h3>Şifremi Unuttum</h3>
+            <label class="field">E-posta<input id="forgotEmail" type="email" placeholder="eposta@ornek.com" /></label>
+            <div class="actions"><button id="forgotBtn" class="btn">Gönder</button></div>
+            <div id="forgotMsg" class="hint" hidden>Bağlantı e‑posta adresine gönderildi (geliştirmede loga yazılır).</div>
+          </div>
+          <div id="resetBox" class="card" hidden>
+            <h3>Şifre Sıfırla</h3>
+            <div class="grid two">
+              <label class="field">Yeni Parola<input id="resetPass1" type="password" /></label>
+              <label class="field">Tekrar<input id="resetPass2" type="password" /></label>
+            </div>
+            <div class="actions"><button id="resetBtn" class="btn">Sıfırla</button></div>
+            <div id="resetMsg" class="hint" hidden>Şifreniz güncellendi. Giriş yapabilirsiniz.</div>
+          </div>
+        </div>
+      </section>
+
+      <section id="register" class="panel" role="tabpanel">
+        <div class="card">
+          <h2>Kayıt Ol</h2>
+          <div class="grid two">
+            <label class="field">E-posta<input id="registerEmail" type="email" autocomplete="username" /></label>
+            <label class="field">Parola<input id="registerPassword" type="password" autocomplete="new-password" /></label>
+          </div>
+          <label class="field">Parola (tekrar)<input id="registerPassword2" type="password" autocomplete="new-password" /></label>
+          <div class="actions">
+            <button id="registerBtn" class="btn">Kayıt Ol</button>
+          </div>
+          <div id="registerError" class="hint error" hidden></div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="container muted small center">
+      <p>Veriler yalnızca bu cihazda saklanır (localStorage). PWA olarak yükleyebilir ve çevrimdışı kullanabilirsiniz.</p>
+    </footer>
+
+    <script src="/config.js"></script>
+    <script src="/app.js" type="module"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'))
+      }
+    </script>
+  </body>
+</html>
