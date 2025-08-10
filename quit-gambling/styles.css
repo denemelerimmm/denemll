@@ -48,3 +48,5 @@ input[type="range"]{width:100%}
 .breath{display:grid;place-items:center;height:120px}
 .breath .circle{width:80px;height:80px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#7dd3fc,#2563eb);animation:breath 16s ease-in-out infinite}
 @keyframes breath{0%{transform:scale(.8)}25%{transform:scale(1)}50%{transform:scale(.8)}75%{transform:scale(1)}100%{transform:scale(.8)}}
+.hidden{display:none!important}
+.error{color:#fca5a5}

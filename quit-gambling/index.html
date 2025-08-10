@@ -19,12 +19,15 @@
 
     <main class="container">
       <nav class="tabs" role="tablist" aria-label="Bölümler">
-        <button class="tab active" data-tab="dashboard" role="tab" aria-selected="true">Genel Bakış</button>
-        <button class="tab" data-tab="checkin" role="tab" aria-selected="false">Günlük Yoklama</button>
-        <button class="tab" data-tab="triggers" role="tab" aria-selected="false">Tetikleyiciler</button>
-        <button class="tab" data-tab="urge" role="tab" aria-selected="false">Dürtü Sayacı</button>
-        <button class="tab" data-tab="support" role="tab" aria-selected="false">Destek</button>
-        <button class="tab" data-tab="settings" role="tab" aria-selected="false" title="Ayarlar">⚙️</button>
+        <button class="tab guest-only active" data-tab="login" role="tab" aria-selected="true">Giriş</button>
+        <button class="tab guest-only" data-tab="register" role="tab" aria-selected="false">Kayıt</button>
+
+        <button class="tab auth-only" data-tab="dashboard" role="tab" aria-selected="false">Genel Bakış</button>
+        <button class="tab auth-only" data-tab="checkin" role="tab" aria-selected="false">Günlük Yoklama</button>
+        <button class="tab auth-only" data-tab="triggers" role="tab" aria-selected="false">Tetikleyiciler</button>
+        <button class="tab auth-only" data-tab="urge" role="tab" aria-selected="false">Dürtü Sayacı</button>
+        <button class="tab auth-only" data-tab="support" role="tab" aria-selected="false">Destek</button>
+        <button class="tab auth-only" data-tab="settings" role="tab" aria-selected="false" title="Ayarlar">⚙️</button>
       </nav>
 
       <section id="dashboard" class="panel active" role="tabpanel">
@@ -207,8 +210,37 @@
               Veriyi içe aktar
               <input id="importData" type="file" accept="application/json" />
             </label>
+            <button id="logoutBtn" class="btn danger">Çıkış Yap</button>
           </div>
           <div id="settingsSaved" class="hint" hidden>Kaydedildi ✓</div>
+        </div>
+      </section>
+      <section id="login" class="panel" role="tabpanel">
+        <div class="card">
+          <h2>Giriş Yap</h2>
+          <div class="grid two">
+            <label class="field">E-posta<input id="loginEmail" type="email" autocomplete="username" /></label>
+            <label class="field">Parola<input id="loginPassword" type="password" autocomplete="current-password" /></label>
+          </div>
+          <div class="actions">
+            <button id="loginBtn" class="btn">Giriş</button>
+          </div>
+          <div id="loginError" class="hint error" hidden></div>
+        </div>
+      </section>
+
+      <section id="register" class="panel" role="tabpanel">
+        <div class="card">
+          <h2>Kayıt Ol</h2>
+          <div class="grid two">
+            <label class="field">E-posta<input id="registerEmail" type="email" autocomplete="username" /></label>
+            <label class="field">Parola<input id="registerPassword" type="password" autocomplete="new-password" /></label>
+          </div>
+          <label class="field">Parola (tekrar)<input id="registerPassword2" type="password" autocomplete="new-password" /></label>
+          <div class="actions">
+            <button id="registerBtn" class="btn">Kayıt Ol</button>
+          </div>
+          <div id="registerError" class="hint error" hidden></div>
         </div>
       </section>
     </main>
