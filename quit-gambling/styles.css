@@ -11,6 +11,7 @@ header h1{margin:12px 0}
 .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 16px}
 .tab{background:transparent;color:var(--text);border:1px solid var(--border);border-radius:10px;padding:8px 12px;cursor:pointer}
 .tab.active{background:var(--accent);color:#001018;border-color:transparent}
+.tab.small{padding:6px 10px;font-size:.9rem}
 .panel{display:none}
 .panel.active{display:block}
 
@@ -50,3 +51,6 @@ input[type="range"]{width:100%}
 @keyframes breath{0%{transform:scale(.8)}25%{transform:scale(1)}50%{transform:scale(.8)}75%{transform:scale(1)}100%{transform:scale(.8)}}
 .hidden{display:none!important}
 .error{color:#fca5a5}
+.stories{display:grid;gap:12px}
+.video{position:relative;padding-top:56.25%;border-radius:12px;overflow:hidden;border:1px solid var(--border)}
+.video iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000}

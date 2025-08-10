@@ -48,6 +48,8 @@
               <div class="label">Bu Hafta Yoklama</div>
             </div>
           </div>
+          <div class="muted">Bırakış Tarihi: <span id="quitDateDisplay">-</span></div>
+          <div class="actions"><label class="field">Tarihi Güncelle<input id="quitDateDash" type="date" /></label><button id="saveQuitDateDash" class="btn ghost">Güncelle</button></div>
         </div>
 
         <div class="grid">
@@ -69,6 +71,25 @@
               <button id="clearQuickNote" class="btn danger ghost">Temizle</button>
             </div>
           </div>
+        </div>
+        <div class="card">
+          <h3>İbretlik Hikayeler</h3>
+          <div class="tabs" role="tablist">
+            <button class="tab small" data-stories-tab="video">Videolar</button>
+            <button class="tab small" data-stories-tab="text">Yazılar</button>
+          </div>
+          <div id="storiesVideo" class="stories"></div>
+          <div id="storiesText" class="stories" hidden></div>
+          <details>
+            <summary>Hikaye ekle</summary>
+            <div class="grid two">
+              <label class="field">Tür<select id="storyType"><option value="video">Video</option><option value="text">Yazı</option></select></label>
+              <label class="field">Başlık<input id="storyTitle" type="text" placeholder="Kısa başlık" /></label>
+            </div>
+            <label class="field" id="storyUrlField">URL<input id="storyUrl" type="url" placeholder="YouTube veya makale linki" /></label>
+            <label class="field" id="storyContentField" hidden>Metin<textarea id="storyContent" rows="3" placeholder="Kısa hikaye metni"></textarea></label>
+            <div class="actions"><button id="addStory" class="btn">Ekle</button></div>
+          </details>
         </div>
       </section>
 

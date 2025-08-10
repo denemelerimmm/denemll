@@ -73,13 +73,8 @@ const state = {
   notes: { quick: '', sos: '' }
 }
 
-function hydrateFromStorage(){
-  state.settings = storage.get(keyFor('settings'), { quitDate: '', dailyGoal: '', motivations: '' })
-  state.checkins = storage.get(keyFor('checkins'), [])
-  state.triggers = storage.get(keyFor('triggers'), [])
-  state.urges = storage.get(keyFor('urges'), [])
-  state.notes = storage.get(keyFor('notes'), { quick: '', sos: '' })
-}
+// Stories state per user
+state.stories = storage.get(keyFor('stories'), []) // [{id,type:'video'|'text',title,url?,content?,addedAt}]
 
 function saveAll(){
   storage.set(keyFor('settings'), state.settings)
@@ -87,7 +82,24 @@ function saveAll(){
   storage.set(keyFor('triggers'), state.triggers)
   storage.set(keyFor('urges'), state.urges)
   storage.set(keyFor('notes'), state.notes)
+  storage.set(keyFor('stories'), state.stories)
 }
+
+function hydrateFromStorage(){
+  state.settings = storage.get(keyFor('settings'), { quitDate: '', dailyGoal: '', motivations: '' })
+  state.checkins = storage.get(keyFor('checkins'), [])
+  state.triggers = storage.get(keyFor('triggers'), [])
+  state.urges = storage.get(keyFor('urges'), [])
+  state.notes = storage.get(keyFor('notes'), { quick: '', sos: '' })
+  state.stories = storage.get(keyFor('stories'), [])
+}
+
+// Quit date inline update on dashboard
+$('#saveQuitDateDash')?.addEventListener('click', () => {
+  const val = $('#quitDateDash').value || ''
+  state.settings.quitDate = val
+  saveAll(); updateDashboard(); loadSettingsUI()
+})
 
 async function sha256(message){
   const msgUint8 = new TextEncoder().encode(message)
@@ -150,6 +162,7 @@ $('#importData')?.addEventListener('change', async (e) => {
     if (Array.isArray(data.triggers)) state.triggers = data.triggers
     if (Array.isArray(data.urges)) state.urges = data.urges
     if (data.notes) state.notes = data.notes
+    if (Array.isArray(data.stories)) state.stories = data.stories
     saveAll(); loadSettingsUI(); renderAll(); alert('Veriler içe aktarıldı.')
   } catch { alert('Geçersiz dosya.') }
 })
@@ -210,8 +223,79 @@ function renderUrges(){ const list=$('#urgeHistory'); if(!list) return; list.inn
 
 // Dashboard
 function updateTodayGoal(){ const el=$('#todayGoalText'); if(el) el.textContent = state.settings.dailyGoal || 'Ayarlar\'dan hedef belirleyin.' }
-function updateDashboard(){ updateTodayGoal(); const quit=state.settings.quitDate; const d=$('#daysSinceQuit'); if(d) d.textContent = quit? daysBetween(quit,new Date()) : 0; const sorted=[...state.checkins].sort((a,b)=>b.date.localeCompare(a.date)); let streak=0; let cursor=formatYMD(new Date()); for(const c of sorted){ if(c.date===cursor && c.success!==false){ streak++; cursor=formatYMD(new Date(new Date(cursor).getTime()-86400000)) } else if (c.date>cursor){ continue } else { break } } const s=$('#streakDays'); if(s) s.textContent=streak }
-function renderAll(){ renderCheckins(); renderTriggers(); renderUrges(); updateDashboard(); loadSettingsUI(); }
+function updateDashboard(){
+  updateTodayGoal();
+  const quit = state.settings.quitDate
+  const d=$('#daysSinceQuit'); if(d) d.textContent = quit? daysBetween(quit,new Date()) : 0
+  const qd=$('#quitDateDisplay'); if(qd) qd.textContent = quit || '—'
+  const qdi=$('#quitDateDash'); if(qdi && quit) qdi.value = quit
+  const sorted=[...state.checkins].sort((a,b)=>b.date.localeCompare(a.date)); let streak=0; let cursor=formatYMD(new Date());
+  for(const c of sorted){ if(c.date===cursor && c.success!==false){ streak++; cursor=formatYMD(new Date(new Date(cursor).getTime()-86400000)) } else if (c.date>cursor){ continue } else { break } }
+  const s=$('#streakDays'); if(s) s.textContent=streak
+}
+
+// Stories logic
+function toYouTubeEmbed(url){
+  try{
+    const u = new URL(url)
+    if (u.hostname.includes('youtu.be')){ return `https://www.youtube.com/embed/${u.pathname.replace('/', '')}` }
+    if (u.hostname.includes('youtube.com')){
+      if (u.pathname.startsWith('/watch')){ const id=u.searchParams.get('v'); if(id) return `https://www.youtube.com/embed/${id}` }
+      if (u.pathname.startsWith('/shorts/')){ const id=u.pathname.split('/')[2]; if(id) return `https://www.youtube.com/embed/${id}` }
+    }
+  }catch{}
+  return ''
+}
+
+function renderStories(){
+  const videoC = $('#storiesVideo'); const textC = $('#storiesText')
+  if(!videoC || !textC) return
+  videoC.innerHTML=''; textC.innerHTML=''
+  state.stories.filter(s=>s.type==='video').forEach(s=>{
+    const wrap = document.createElement('div')
+    const embed = toYouTubeEmbed(s.url||'')
+    if (embed){
+      wrap.innerHTML = `<div class="video"><iframe src="${embed}?rel=0" allowfullscreen loading="lazy"></iframe></div><div class="meta" style="margin-top:6px">${s.title||''}</div>`
+    } else {
+      wrap.innerHTML = `<div><a class="meta" target="_blank" rel="noopener" href="${s.url}">${s.title||s.url}</a></div>`
+    }
+    videoC.appendChild(wrap)
+  })
+  state.stories.filter(s=>s.type==='text').forEach(s=>{
+    const div = document.createElement('div')
+    div.className='card'
+    div.innerHTML = `<strong>${s.title||'Hikaye'}</strong><div class="meta" style="margin-top:6px">${(s.content||'').replace(/</g,'&lt;')}</div>`
+    textC.appendChild(div)
+  })
+}
+
+// Stories UI events
+$$('[data-stories-tab]').forEach(btn=>btn.addEventListener('click',()=>{
+  const t = btn.getAttribute('data-stories-tab')
+  $$('#dashboard .tab.small').forEach(b=>b.classList.toggle('active', b===btn))
+  $('#storiesVideo').hidden = t!=='video'
+  $('#storiesText').hidden = t!=='text'
+}))
+
+$('#storyType')?.addEventListener('change', () => {
+  const t = $('#storyType').value
+  $('#storyUrlField').hidden = t!=='video'
+  $('#storyContentField').hidden = t!=='text'
+})
+
+$('#addStory')?.addEventListener('click', () => {
+  const type = $('#storyType').value
+  const title = ($('#storyTitle').value||'').trim()
+  const url = ($('#storyUrl').value||'').trim()
+  const content = ($('#storyContent').value||'').trim()
+  if (type==='video' && !url) return
+  if (type==='text' && !content) return
+  const id = (crypto.randomUUID && crypto.randomUUID()) || String(Date.now())
+  state.stories.unshift({ id, type, title, url, content, addedAt: new Date().toISOString() })
+  saveAll(); renderStories(); $('#storyTitle').value=''; $('#storyUrl').value=''; $('#storyContent').value=''
+})
+
+function renderAll(){ renderCheckins(); renderTriggers(); renderUrges(); updateDashboard(); loadSettingsUI(); renderStories() }
 
 // Auth events
 $('#loginBtn')?.addEventListener('click', async () => {
